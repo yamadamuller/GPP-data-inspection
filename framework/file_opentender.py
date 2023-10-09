@@ -8,7 +8,7 @@ class OPENTENDERfiles:
         else:
             self.years = year
 
-        self.path = "C:/Users/yamad/OneDrive/Documentos/FORCERA/GPP/GPP-data-inspection/data/"
+        self.path = "C:/Users/yamad/OneDrive/Documentos/FORCERA/GPP/GPP-data-inspection/data/opentender/"
         self.raw_dataframe = pd.DataFrame()
         self.fill_dataframe = pd.DataFrame()
 

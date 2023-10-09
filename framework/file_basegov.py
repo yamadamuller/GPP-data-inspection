@@ -8,7 +8,7 @@ class BASEGOVfiles:
         else:
             self.years = years
 
-        self.path = "C:/Users/yamad/OneDrive/Documentos/FORCERA/GPP/GPP-data-inspection/data/"
+        self.path = "C:/Users/yamad/OneDrive/Documentos/FORCERA/GPP/GPP-data-inspection/data/basegov/"
         self.raw_dataframe = pd.DataFrame()
         self.fill_dataframe = pd.DataFrame()
         self.NIPC = list()

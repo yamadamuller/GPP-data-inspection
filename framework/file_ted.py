@@ -7,7 +7,7 @@ from unidecode import unidecode
 
 class TEDfiles:
     def __init__(self):
-        self.path = "C:/Users/yamad/OneDrive/Documentos/FORCERA/GPP/GPP-data-inspection/data/"
+        self.path = "C:/Users/yamad/OneDrive/Documentos/FORCERA/GPP/GPP-data-inspection/data/ted/"
         self.file = "TED_award_2018-2022.csv"
         self.lang = str()
         self.raw_dataframe = pd.DataFrame()
