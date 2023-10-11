@@ -18,16 +18,15 @@ class EXIOfiles:
 
         self.region_filter = region_filter
         self.exio_raw = pd.DataFrame()
-        self.Z = pd.DataFrame()
+        self.A = pd.DataFrame()
         self.Y = pd.DataFrame()
-        self.x = pd.DataFrame()
         self.M = pd.DataFrame()
 
     def read(self):
         print(f'[Class {self.__class__.__name__}] Reading {self.file}...')
 
         files = list()
-        names = ['Z', 'Y', 'M']
+        names = ['A', 'Y', 'M']
         for nm in range(len(names)):
             files.append(names[nm] + str(self.year) + '.pkl')
         files.sort()
@@ -38,31 +37,31 @@ class EXIOfiles:
                 with open(self.path + 'pkls/' + file, 'rb') as curr_pkl:
                     pklIO.append(pickle.load(curr_pkl))
 
-            self.Z = pklIO.pop()
             self.Y = pklIO.pop()
             self.M = pklIO.pop()
+            self.A = pklIO.pop()
 
         else:
             self.exio_raw = pymrio.parse_exiobase3(path=self.path + self.file)
 
-            self.Z = self.exio_raw.Z
+            self.A = self.exio_raw.A
             self.Y = self.exio_raw.Y
             self.M = self.exio_raw.satellite.M
 
-            to_pkl = [self.Z, self.Y, self.M]
+            to_pkl = [self.A, self.Y, self.M]
             for par in range(len(to_pkl)):
                 to_pkl[par].to_pickle(self.path + 'pkls/' + f'{names[par] + str(self.year)}.pkl')
 
         self.regFilter()
         print(f'[Class {self.__class__.__name__}] {self.file} read!')
 
-        return self.M, self.Y, self.Z
+        return self.M, self.Y, self.A
 
     def regFilter(self):
         if self.region_filter:
             line_idx = list()
-            for ln in range(len(self.Z.index)):
-                if (self.Z.index[ln])[0] in self.ISO_code:
+            for ln in range(len(self.A.index)):
+                if (self.A.index[ln])[0] in self.ISO_code:
                     line_idx.append(ln)
 
             clm_idx = list()
@@ -70,7 +69,7 @@ class EXIOfiles:
                 if (self.Y.columns[clm])[0] in self.ISO_code:
                     clm_idx.append(clm)
 
-            self.Z = self.Z.iloc[line_idx, line_idx]
+            self.A = self.A.iloc[line_idx, line_idx]
             self.Y = self.Y.iloc[line_idx, clm_idx]
             self.M = self.M.iloc[:,line_idx]
 
