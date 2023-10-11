@@ -1,19 +1,17 @@
 import numpy as np
 from framework import file_exiobase3
 
-EB = file_exiobase3.EXIOfiles('PT')
-exio = EB.read()
-#EB.StructAlgebra()
+EU27 = ['AT', 'BE', 'BG', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GR', 'HU', 'IE', 'IT',
+        'LT', 'LU', 'LV', 'MT', 'NL', 'PL', 'PT', 'RO', 'SE', 'SI', 'SK', 'GB']
 
-PT_idx = list()
-for idx in range(len(exio.A.index)):
-    if (exio.A.index[idx])[0] == 'PT':
-        PT_idx.append(idx)
+year = 2007
+exio = file_exiobase3.EXIOfiles(EU27, year, region_filter=True)
+M, Y, Z = exio.read()
 
-PT_clm_idx = list()
-for clm_idx in range(len(exio.Y.columns)):
-    if (exio.Y.columns[clm_idx])[0] == 'PT':
-        PT_clm_idx.append(clm_idx)
+
+
+
+
 
 
 

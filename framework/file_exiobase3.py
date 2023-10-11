@@ -1,50 +1,78 @@
 import pymrio
 import numpy as np
 import pandas as pd
+import os
+import pickle
 from sklearn.metrics import mean_squared_error
 
 class EXIOfiles:
-    def __init__(self, ISO_country_code, region_filter=False):
+    def __init__(self, ISO_country_code, IOT_year, region_filter=False):
         self.path = "C:/Users/yamad/OneDrive/Documentos/FORCERA/GPP/GPP-data-inspection/data/exiobase/"
-        self.file = "IOT_2017_ixi.zip"
-        self.ISO_code = ISO_country_code
+        self.file = f"IOT_{IOT_year}_pxp.zip"
+        self.year = IOT_year
+
+        if isinstance(ISO_country_code, list):
+            self.ISO_code = ISO_country_code
+        else:
+            self.ISO_code = [ISO_country_code]
+
         self.region_filter = region_filter
         self.exio_raw = pd.DataFrame()
         self.Z = pd.DataFrame()
         self.Y = pd.DataFrame()
-        self.A = pd.DataFrame()
         self.x = pd.DataFrame()
-        self.L = pd.DataFrame()
+        self.M = pd.DataFrame()
 
     def read(self):
-        self.exio_raw = pymrio.parse_exiobase3(path=self.path + self.file)
+        print(f'[Class {self.__class__.__name__}] Reading {self.file}...')
 
-        if self.region_filter:
-            line_idx = list()
-            for idx in range(len(self.exio_raw.A.index)):
-                if (self.exio_raw.A.index[idx])[0] == self.ISO_code:
-                    line_idx.append(idx)
+        files = list()
+        names = ['Z', 'Y', 'M']
+        for nm in range(len(names)):
+            files.append(names[nm] + str(self.year) + '.pkl')
+        files.sort()
 
-            clm_idx = list()
-            for clm in range(len(self.exio_raw.Y.columns)):
-                if (self.exio_raw.Y.columns[clm])[0] == self.ISO_code:
-                    clm_idx.append(clm)
+        if os.path.exists(self.path + 'pkls/' + files[0]):
+            pklIO = list()
+            for file in files:
+                with open(self.path + 'pkls/' + file, 'rb') as curr_pkl:
+                    pklIO.append(pickle.load(curr_pkl))
 
-            self.Z = self.exio_raw.Z.iloc[line_idx, line_idx]
-            self.Y = self.exio_raw.Y.iloc[line_idx, clm_idx]
-            self.A = self.exio_raw.A.iloc[line_idx, line_idx]
-            self.x = self.exio_raw.x.iloc[line_idx]
+            self.Z = pklIO.pop()
+            self.Y = pklIO.pop()
+            self.M = pklIO.pop()
+
         else:
+            self.exio_raw = pymrio.parse_exiobase3(path=self.path + self.file)
+
             self.Z = self.exio_raw.Z
             self.Y = self.exio_raw.Y
-            self.A = self.exio_raw.A
-            self.x = self.exio_raw.x
+            self.M = self.exio_raw.satellite.M
 
-        self.L = np.linalg.inv(np.eye(len(self.A)) - self.A) #leontief matrix
+            to_pkl = [self.Z, self.Y, self.M]
+            for par in range(len(to_pkl)):
+                to_pkl[par].to_pickle(self.path + 'pkls/' + f'{names[par] + str(self.year)}.pkl')
 
+        self.regFilter()
         print(f'[Class {self.__class__.__name__}] {self.file} read!')
 
-        return self.exio_raw
+        return self.M, self.Y, self.Z
+
+    def regFilter(self):
+        if self.region_filter:
+            line_idx = list()
+            for ln in range(len(self.Z.index)):
+                if (self.Z.index[ln])[0] in self.ISO_code:
+                    line_idx.append(ln)
+
+            clm_idx = list()
+            for clm in range(len(self.Y.columns)):
+                if (self.Y.columns[clm])[0] in self.ISO_code:
+                    clm_idx.append(clm)
+
+            self.Z = self.Z.iloc[line_idx, line_idx]
+            self.Y = self.Y.iloc[line_idx, clm_idx]
+            self.M = self.M.iloc[:,line_idx]
 
     def StructAlgebra(self):
         final_demand = (self.Y @ np.ones((np.shape(self.Y)[1], 1)))
