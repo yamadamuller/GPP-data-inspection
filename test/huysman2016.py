@@ -6,22 +6,22 @@ from framework import file_exiobase3
 def GWP_element_extractor(flow):
         return flow[:3]
 
+#Control variables
 EU27 = ['AT', 'BE', 'BG', 'CZ', 'CY', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GR', 'HU',
         'IE', 'IT', 'LT', 'LU', 'LV', 'MT', 'NL', 'PL', 'PT', 'RO', 'SE', 'SI', 'SK', 'GB']
 EU_pop = 493000000
-
 year = 2007
-exio = file_exiobase3.EXIOfiles(EU27, year, region_filter=True)
+idx_stress = 13
+
+#Reading EXIOBASE file
+exio = file_exiobase3.EXIOfiles(EU27, year, region_filter=True, household=True)
 A, Dcba, F, M, S, Y, Z = exio.read()
+test = Y
 
 #IO-model calculations (Leontief)
 house_occ = np.arange(0,len(Y.columns.values),7)
 Y = Y.iloc[:, house_occ]
-#out = Z @ np.ones((np.shape(Z)[1],1)) + Y @ np.ones((np.shape(Y)[1],1))
 f = Y @ np.ones((np.shape(Y)[1],1))
-#inv_out = np.diagflat(1/out)
-#inv_out[np.where(inv_out == np.inf)] = 0
-#A = Z @ inv_out
 L = np.linalg.inv(np.eye(len(A)) - A)
 output = L @ f
 output.rename(columns={0: "output"}, inplace=True)
@@ -47,22 +47,31 @@ total_stressor.reset_index(inplace=True)
 total_stressor['stressor'] = total_stressor['stressor'].apply(GWP_element_extractor)
 
 #characterization factor (kg CO2 eq)
-GW_convert = {'CO2': 1, 'N2O': 1, 'CH4': 1, 'SF6': 1}
+GW_convert = {'CO2': 1, 'N2O': 298, 'CH4': 25, 'SF6': 22800}
 conv_mat = np.zeros((len(total_stressor['stressor']),1))
 for stressor in range(np.shape(conv_mat)[0]):
         conv_mat[stressor] = GW_convert[total_stressor['stressor'].values[stressor]]
 total_stressor.drop('stressor', axis=1, inplace=True)
 total_stressor = total_stressor * conv_mat
 
+#Testing household accounting
+f_hh = test @ np.ones((np.shape(test)[1],1))
+total_req = M @ np.diagflat(f_hh)
+invMat = Dcba - total_req.values
+conv_invMat = invMat.iloc[GWP_idx,:]
+conv_invMat = conv_invMat * conv_mat
+conv_invMat = conv_invMat.iloc[:idx_stress,:]
+sum_invMat = conv_invMat.sum(axis=0)
+
 #Environmental matrix
 x_hat = np.diagflat(1/output['output'])
 x_hat[np.where(x_hat == np.inf)] = 0
-B = total_stressor.iloc[:13,:] @ x_hat
+B = total_stressor.iloc[:idx_stress,:] @ x_hat
 
 #Inventory vector
 g = B @ L
 g = g.sum(axis=0)
-footprint = g @ np.diagflat(f)
+footprint = g @ np.diagflat(f) + sum_invMat
 footprint /= EU_pop
 footprint = pd.DataFrame(footprint)
 footprint.index = A.index
@@ -91,12 +100,10 @@ for key in grp_keys:
 footprint_HH = EU_footprint.sum(axis=0)
 footprint_HH = footprint_HH.iloc[1:]
 footprint_HH /= 1000
-'''
+
 plt.figure()
-plt.bar(footprint_HH.index, footprint.values, width=0.4)
+plt.bar(footprint_HH.index, footprint_HH.values, width=0.4)
 plt.xlabel('Activity')
 plt.ylabel('tons CO2 eq per capita')
 plt.title('Global Warming Potential (GWP)')
-plt.grid()
 plt.show()
-'''

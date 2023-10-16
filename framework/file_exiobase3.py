@@ -3,10 +3,9 @@ import numpy as np
 import pandas as pd
 import os
 import pickle
-from sklearn.metrics import mean_squared_error
 
 class EXIOfiles:
-    def __init__(self, ISO_country_code, IOT_year, region_filter=False):
+    def __init__(self, ISO_country_code, IOT_year, region_filter=False, household=False):
         self.path = "C:/Users/yamad/OneDrive/Documentos/FORCERA/GPP/GPP-data-inspection/data/exiobase/"
         self.file = f"IOT_{IOT_year}_pxp.zip"
         self.year = IOT_year
@@ -17,14 +16,24 @@ class EXIOfiles:
             self.ISO_code = [ISO_country_code]
 
         self.region_filter = region_filter
+        self.household = household
         self.exio_raw = pd.DataFrame()
         self.A = pd.DataFrame()
         self.Y = pd.DataFrame()
+        self.safe_Y = self.Y
         self.M = pd.DataFrame()
         self.S = pd.DataFrame()
         self.F = pd.DataFrame()
         self.Dcba = pd.DataFrame()
         self.Z = pd.DataFrame()
+        self.f = pd.DataFrame()
+        self.L = np.array([])
+        self.output = pd.DataFrame()
+        self.total_stressor = pd.DataFrame()
+        self.idx_stress = 13
+        self.sum_invMat = pd.Series()
+        self.footprint = pd.DataFrame()
+        self.EU_footprint = pd.DataFrame()
 
     def read(self):
         print(f'[Class {self.__class__.__name__}] Reading {self.file}...')
@@ -43,6 +52,7 @@ class EXIOfiles:
 
             self.Z = pklIO.pop()
             self.Y = pklIO.pop()
+            self.safe_Y = self.Y
             self.S = pklIO.pop()
             self.M = pklIO.pop()
             self.F = pklIO.pop()
@@ -55,6 +65,7 @@ class EXIOfiles:
             self.A = self.exio_raw.A
             self.Z = self.exio_raw.Z
             self.Y = self.exio_raw.Y
+            self.safe_Y = self.Y
             self.M = self.exio_raw.satellite.M
             self.S = self.exio_raw.satellite.S
             self.F = self.exio_raw.satellite.F
@@ -65,6 +76,7 @@ class EXIOfiles:
                 to_pkl[par].to_pickle(self.path + 'pkls/' + f'{names[par] + str(self.year)}.pkl')
 
         self.regFilter()
+        self.footprint_est()
         print(f'[Class {self.__class__.__name__}] {self.file} read!')
 
         return self.A, self.Dcba, self.F, self.M, self.S, self.Y, self.Z
@@ -89,7 +101,99 @@ class EXIOfiles:
             self.A = self.A.iloc[line_idx, line_idx]
             self.Z = self.Z.iloc[line_idx, line_idx]
             self.Y = self.Y.iloc[line_idx, clm_idx]
+            self.safe_Y = self.Y
             self.M = self.M.iloc[:,line_idx]
             self.S = self.S.iloc[:,strs_idx]
             self.F = self.F.iloc[:,strs_idx]
             self.Dcba = self.Dcba.iloc[:,line_idx]
+
+    def leontief(self):
+        if self.household:
+            house_occ = np.arange(0,len(self.Y.columns.values),7)
+            self.Y = self.Y.iloc[:, house_occ]
+
+        self.f = self.Y @ np.ones((np.shape(self.Y)[1],1))
+        self.L = np.linalg.inv(np.eye(len(self.A)) - self.A)
+        self.output = self.L @ self.f
+        self.output.rename(columns={0: "output"}, inplace=True)
+        self.output.index = self.f.index
+        reg = list()
+        for idx in range(len(self.f.index)):
+            reg.append(self.f.index[idx][0])
+        self.output['ISO_code'] = reg
+
+    def GWP_element_extractor(self,flow):
+        return flow[:3]
+
+    def stressFilt(self):
+        GWP_idx = list()
+        stressor_GWP = ['CO2', 'N2O', 'CH4', 'SF6']
+        stressor_idx = self.F.index.tolist()
+        for i in range(len(stressor_idx)):
+            for j in stressor_GWP:
+                if stressor_idx[i].find(j) != -1:
+                    GWP_idx.append(i)
+                    continue
+
+        self.total_stressor = self.F.iloc[GWP_idx,:]
+        self.total_stressor.reset_index(inplace=True)
+        self.total_stressor['stressor'] = self.total_stressor['stressor'].apply(self.GWP_element_extractor)
+
+        #Characterization factor (kg -> kg CO2 eq)
+        GW_convert = {'CO2': 1, 'N2O': 298, 'CH4': 25, 'SF6': 22800}
+        conv_mat = np.zeros((len(self.total_stressor['stressor']), 1))
+        for stressor in range(np.shape(conv_mat)[0]):
+            conv_mat[stressor] = GW_convert[self.total_stressor['stressor'].values[stressor]]
+        self.total_stressor.drop('stressor', axis=1, inplace=True)
+        self.total_stressor = self.total_stressor * conv_mat
+
+        #household accounting test
+        f_hh = self.safe_Y @ np.ones((np.shape(self.safe_Y)[1], 1))
+        total_req = self.M @ np.diagflat(f_hh)
+        invMat = self.Dcba - total_req.values
+        conv_invMat = invMat.iloc[GWP_idx, :]
+        conv_invMat = conv_invMat * conv_mat
+        conv_invMat = conv_invMat.iloc[:self.idx_stress, :]
+        self.sum_invMat = conv_invMat.sum(axis=0)
+
+    def inventory(self):
+        #environmental matrix
+        x_hat = np.diagflat(1/self.output['output'])
+        x_hat[np.where(x_hat == np.inf)] = 0
+        B = self.total_stressor.iloc[:self.idx_stress, :] @ x_hat
+
+        #inventory vector per capita
+        EU_pop = 493000000
+        g = B @ self.L
+        g = g.sum(axis=0)
+        self.footprint = g @ np.diagflat(self.f) + self.sum_invMat
+        self.footprint /= EU_pop
+        self.footprint = pd.DataFrame(self.footprint)
+        self.footprint.index = self.A.index
+
+    def footprint_est(self):
+        #run calculation functions
+        self.leontief()
+        self.stressFilt()
+        self.inventory()
+
+        #EU basket-of-products
+        conv_HH = np.load(self.path[:-9] + 'conversions/'+'conv_HH.npy')
+        HH_atv = ['ISO_code', 'Food', 'Goods', 'Mobility', 'Shelter', 'Services']
+        self.EU_footprint = pd.DataFrame(columns=HH_atv)
+        #self.footprint.index = self.A.index
+        reg = list()
+        for idx in range(len(self.footprint.index)):
+            reg.append(self.footprint.index[idx][0])
+        self.footprint['ISO_code'] = reg
+        self.footprint.rename(columns={0: "output"}, inplace=True)
+        grouped_frame = self.footprint.groupby(self.footprint['ISO_code'])
+        grp_keys = grouped_frame.groups.keys()
+        for key in grp_keys:
+            curr_group = grouped_frame['output'].get_group(key)
+            conv_group = np.expand_dims(curr_group, axis=1) * conv_HH
+            total_conv = conv_group.sum(axis=0)
+            entry = {'ISO_code': key, 'Food': total_conv[0], 'Goods': total_conv[1], 'Mobility': total_conv[2],
+                     'Shelter': total_conv[3], 'Services': total_conv[4]}
+            self.EU_footprint.loc[len(self.EU_footprint)] = entry
+
