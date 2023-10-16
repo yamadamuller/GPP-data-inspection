@@ -176,24 +176,3 @@ class EXIOfiles:
         self.leontief()
         self.stressFilt()
         self.inventory()
-
-        #EU basket-of-products
-        conv_HH = np.load(self.path[:-9] + 'conversions/'+'conv_HH.npy')
-        HH_atv = ['ISO_code', 'Food', 'Goods', 'Mobility', 'Shelter', 'Services']
-        self.EU_footprint = pd.DataFrame(columns=HH_atv)
-        #self.footprint.index = self.A.index
-        reg = list()
-        for idx in range(len(self.footprint.index)):
-            reg.append(self.footprint.index[idx][0])
-        self.footprint['ISO_code'] = reg
-        self.footprint.rename(columns={0: "output"}, inplace=True)
-        grouped_frame = self.footprint.groupby(self.footprint['ISO_code'])
-        grp_keys = grouped_frame.groups.keys()
-        for key in grp_keys:
-            curr_group = grouped_frame['output'].get_group(key)
-            conv_group = np.expand_dims(curr_group, axis=1) * conv_HH
-            total_conv = conv_group.sum(axis=0)
-            entry = {'ISO_code': key, 'Food': total_conv[0], 'Goods': total_conv[1], 'Mobility': total_conv[2],
-                     'Shelter': total_conv[3], 'Services': total_conv[4]}
-            self.EU_footprint.loc[len(self.EU_footprint)] = entry
-
