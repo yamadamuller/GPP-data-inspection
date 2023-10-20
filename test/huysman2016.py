@@ -14,8 +14,8 @@ year = 2007
 idx_stress = 13
 
 #Reading EXIOBASE file
-exio = file_exiobase3.EXIOfiles(EU27, year, region_filter=True, household=True)
-A, Dcba, F, M, S, Y, Z = exio.read()
+exio = file_exiobase3.EXIOfiles(EU27, year)
+A, Dcba, F, M, Y,x = exio.read()
 test = Y
 
 #IO-model calculations (Leontief)
@@ -100,10 +100,14 @@ for key in grp_keys:
 footprint_HH = EU_footprint.sum(axis=0)
 footprint_HH = footprint_HH.iloc[1:]
 footprint_HH /= 1000
-
+'''
 plt.figure()
 plt.bar(footprint_HH.index, footprint_HH.values, width=0.4)
 plt.xlabel('Activity')
 plt.ylabel('tons CO2 eq per capita')
 plt.title('Global Warming Potential (GWP)')
 plt.show()
+'''
+
+#test household accounting
+S_hh = exio.exio_raw.satellite.S_Y.iloc[GWP_idx,house_occ]

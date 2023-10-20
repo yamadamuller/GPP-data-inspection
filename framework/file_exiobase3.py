@@ -20,12 +20,10 @@ class EXIOfiles:
         self.exio_raw = pd.DataFrame()
         self.A = pd.DataFrame()
         self.Y = pd.DataFrame()
-        self.safe_Y = self.Y
+        self.x = pd.DataFrame()
         self.M = pd.DataFrame()
-        self.S = pd.DataFrame()
         self.F = pd.DataFrame()
         self.Dcba = pd.DataFrame()
-        self.Z = pd.DataFrame()
         self.f = pd.DataFrame()
         self.L = np.array([])
         self.output = pd.DataFrame()
@@ -33,13 +31,12 @@ class EXIOfiles:
         self.idx_stress = 13
         self.sum_invMat = pd.Series()
         self.footprint = pd.DataFrame()
-        self.EU_footprint = pd.DataFrame()
 
     def read(self):
         print(f'[Class {self.__class__.__name__}] Reading {self.file}...')
 
         files = list()
-        names = ['A', 'Dcba','F', 'M', 'S', 'Y', 'Z']
+        names = ['A', 'Dcba','F', 'M', 'Y','x']
         for nm in range(len(names)):
             files.append(names[nm] + str(self.year) + '.pkl')
         files.sort()
@@ -50,10 +47,8 @@ class EXIOfiles:
                 with open(self.path + 'pkls/' + file, 'rb') as curr_pkl:
                     pklIO.append(pickle.load(curr_pkl))
 
-            self.Z = pklIO.pop()
+            self.x = pklIO.pop()
             self.Y = pklIO.pop()
-            self.safe_Y = self.Y
-            self.S = pklIO.pop()
             self.M = pklIO.pop()
             self.F = pklIO.pop()
             self.Dcba = pklIO.pop()
@@ -63,23 +58,21 @@ class EXIOfiles:
             self.exio_raw = pymrio.parse_exiobase3(path=self.path + self.file)
 
             self.A = self.exio_raw.A
-            self.Z = self.exio_raw.Z
             self.Y = self.exio_raw.Y
-            self.safe_Y = self.Y
-            self.M = self.exio_raw.satellite.M
-            self.S = self.exio_raw.satellite.S
+            self.M = self.exio_raw.impacts.M
             self.F = self.exio_raw.satellite.F
             self.Dcba = self.exio_raw.satellite.D_cba
+            self.x = self.exio_raw.x
 
-            to_pkl = [self.A, self.Dcba, self.F, self.M, self.S, self.Y, self.Z]
+            to_pkl = [self.A, self.Dcba, self.F, self.M, self.Y, self.x]
             for par in range(len(to_pkl)):
                 to_pkl[par].to_pickle(self.path + 'pkls/' + f'{names[par] + str(self.year)}.pkl')
 
         self.regFilter()
-        self.footprint_est()
+        #self.footprint_est()
         print(f'[Class {self.__class__.__name__}] {self.file} read!')
 
-        return self.A, self.Dcba, self.F, self.M, self.S, self.Y, self.Z
+        return self.A, self.Dcba, self.F, self.M, self.Y, self.x
 
     def regFilter(self):
         if self.region_filter:
@@ -94,18 +87,17 @@ class EXIOfiles:
                     clm_idx.append(clm)
 
             strs_idx = list()
-            for strs in range(len(self.S.columns)):
-                if (self.S.columns[strs])[0] in self.ISO_code:
+            for strs in range(len(self.F.columns)):
+                if (self.F.columns[strs])[0] in self.ISO_code:
                     strs_idx.append(strs)
 
             self.A = self.A.iloc[line_idx, line_idx]
-            self.Z = self.Z.iloc[line_idx, line_idx]
             self.Y = self.Y.iloc[line_idx, clm_idx]
             self.safe_Y = self.Y
             self.M = self.M.iloc[:,line_idx]
-            self.S = self.S.iloc[:,strs_idx]
             self.F = self.F.iloc[:,strs_idx]
             self.Dcba = self.Dcba.iloc[:,line_idx]
+            self.x = self.x.iloc[line_idx, clm_idx]
 
     def leontief(self):
         if self.household:
