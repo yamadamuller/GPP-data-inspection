@@ -10,7 +10,7 @@ def GWP_element_extractor(flow):
 EU27 = ['AT', 'BE', 'BG', 'CZ', 'CY', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GR', 'HU',
         'IE', 'IT', 'LT', 'LU', 'LV', 'MT', 'NL', 'PL', 'PT', 'RO', 'SE', 'SI', 'SK', 'GB']
 EU_pop = 493000000
-year = 2007
+year = 2011
 idx_stress = 13
 
 #Reading EXIOBASE file
@@ -53,7 +53,7 @@ for stressor in range(np.shape(conv_mat)[0]):
         conv_mat[stressor] = GW_convert[total_stressor['stressor'].values[stressor]]
 total_stressor.drop('stressor', axis=1, inplace=True)
 total_stressor = total_stressor * conv_mat
-
+'''
 #Testing household accounting
 f_hh = test @ np.ones((np.shape(test)[1],1))
 total_req = M @ np.diagflat(f_hh)
@@ -62,7 +62,7 @@ conv_invMat = invMat.iloc[GWP_idx,:]
 conv_invMat = conv_invMat * conv_mat
 conv_invMat = conv_invMat.iloc[:idx_stress,:]
 sum_invMat = conv_invMat.sum(axis=0)
-
+'''
 #Environmental matrix
 x_hat = np.diagflat(1/output['output'])
 x_hat[np.where(x_hat == np.inf)] = 0
@@ -71,7 +71,8 @@ B = total_stressor.iloc[:idx_stress,:] @ x_hat
 #Inventory vector
 g = B @ L
 g = g.sum(axis=0)
-footprint = g @ np.diagflat(f) + sum_invMat
+#footprint = g @ np.diagflat(f) + sum_invMat
+footprint = g @ np.diagflat(f)
 footprint /= EU_pop
 footprint = pd.DataFrame(footprint)
 footprint.index = A.index
@@ -97,9 +98,15 @@ for key in grp_keys:
                  'Shelter': total_conv[3], 'Services': total_conv[4]}
         EU_footprint.loc[len(EU_footprint)] = entry
 
+EU_footprint.index = EU_footprint['ISO_code']
+EU_idx = list()
+for ln in range(len(EU_footprint.index)):
+    if EU_footprint.index[ln] in EU27:
+        EU_idx.append(ln)
+
+EU_footprint = EU_footprint.iloc[EU_idx,:]
 footprint_HH = EU_footprint.sum(axis=0)
 footprint_HH = footprint_HH.iloc[1:]
-footprint_HH /= 1000
 '''
 plt.figure()
 plt.bar(footprint_HH.index, footprint_HH.values, width=0.4)
@@ -109,5 +116,6 @@ plt.title('Global Warming Potential (GWP)')
 plt.show()
 '''
 
-#test household accounting
-S_hh = exio.exio_raw.satellite.S_Y.iloc[GWP_idx,house_occ]
+#Castellani2019
+EU_sum = footprint_HH.sum(axis=0).round(2)/1e12
+EU_sum_nServs = footprint_HH.iloc[:-1].sum(axis=0)/1e12
