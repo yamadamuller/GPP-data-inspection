@@ -7,7 +7,7 @@ def GWP_element_extractor(flow):
         return flow[:3]
 
 #Control variables
-EU27 = ['AT', 'BE', 'BG', 'CZ', 'CY', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GR', 'HU',
+EU27 = ['AT', 'BE', 'BG', 'CZ', 'CY', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GR', 'HU', 'HR',
         'IE', 'IT', 'LT', 'LU', 'LV', 'MT', 'NL', 'PL', 'PT', 'RO', 'SE', 'SI', 'SK', 'GB']
 EU_pop = 493000000
 year = 2011
@@ -19,8 +19,8 @@ A, Dcba, F, M, Y,x = exio.read()
 test = Y
 
 #IO-model calculations (Leontief)
-house_occ = np.arange(0,len(Y.columns.values),7)
-Y = Y.iloc[:, house_occ]
+#house_occ = np.arange(0,len(Y.columns.values),7)
+#Y = Y.iloc[:, house_occ]
 f = Y @ np.ones((np.shape(Y)[1],1))
 L = np.linalg.inv(np.eye(len(A)) - A)
 output = L @ f
@@ -30,8 +30,8 @@ reg = list()
 for idx in range(len(f.index)):
         reg.append(f.index[idx][0])
 output['ISO_code'] = reg
-#output.rename(columns={0: "output"}, inplace=True)
-
+output.rename(columns={0: "output"}, inplace=True)
+'''
 #filtering GWP stressors from the characterization vectors
 GWP_idx = list()
 stressor_GWP = ['CO2', 'N2O', 'CH4', 'SF6']
@@ -53,16 +53,7 @@ for stressor in range(np.shape(conv_mat)[0]):
         conv_mat[stressor] = GW_convert[total_stressor['stressor'].values[stressor]]
 total_stressor.drop('stressor', axis=1, inplace=True)
 total_stressor = total_stressor * conv_mat
-'''
-#Testing household accounting
-f_hh = test @ np.ones((np.shape(test)[1],1))
-total_req = M @ np.diagflat(f_hh)
-invMat = Dcba - total_req.values
-conv_invMat = invMat.iloc[GWP_idx,:]
-conv_invMat = conv_invMat * conv_mat
-conv_invMat = conv_invMat.iloc[:idx_stress,:]
-sum_invMat = conv_invMat.sum(axis=0)
-'''
+
 #Environmental matrix
 x_hat = np.diagflat(1/output['output'])
 x_hat[np.where(x_hat == np.inf)] = 0
@@ -78,7 +69,7 @@ footprint = pd.DataFrame(footprint)
 footprint.index = A.index
 
 #footprint
-path = "C:/Users/yamad/OneDrive/Documentos/FORCERA/GPP/GPP-data-inspection/data/conversions/"
+path = "C:/Users/yamad/OneDrive/Documentos/FORCERA/GPP/forcera-GPP-emission-estimator/GPP-emission-estimator/conversions/"
 conv_HH = np.load(path+'conv_HH.npy')
 HH_atv = ['ISO_code','Food', 'Goods', 'Mobility', 'Shelter', 'Services']
 EU_footprint = pd.DataFrame(columns=HH_atv)
@@ -107,15 +98,16 @@ for ln in range(len(EU_footprint.index)):
 EU_footprint = EU_footprint.iloc[EU_idx,:]
 footprint_HH = EU_footprint.sum(axis=0)
 footprint_HH = footprint_HH.iloc[1:]
-'''
+'
 plt.figure()
 plt.bar(footprint_HH.index, footprint_HH.values, width=0.4)
 plt.xlabel('Activity')
 plt.ylabel('tons CO2 eq per capita')
 plt.title('Global Warming Potential (GWP)')
 plt.show()
-'''
+
 
 #Castellani2019
 EU_sum = footprint_HH.sum(axis=0).round(2)/1e12
 EU_sum_nServs = footprint_HH.iloc[:-1].sum(axis=0)/1e12
+'''

@@ -1,4 +1,9 @@
-{
+import json
+import os
+
+dump_path = os.path.join(os.path.abspath('..'), "CPV_NACE/cpv_cpa_dict.json")
+
+cpv_cpa_dict = {
   "03000000": "A01",
   "03100000": "A01",
   "03110000": "A01",
@@ -9454,3 +9459,6 @@
   "98900000": "U",
   "98910000": "U"
 }
+
+with open(dump_path, 'w') as json_file:
+    json.dump(cpv_cpa_dict, json_file)
